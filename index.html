@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rupak.exe - Interactive Terminal</title>
+    <style>
+        /* CSS Variables */
+        :root {
+            --bg-color: #0a0e17;
+            --grid-color: rgba(56, 189, 248, 0.05);
+            --term-green: #10b981;
+            --labview-neon: #38bdf8;
+            --ai-neon: #c084fc;
+            --text-main: #e2e8f0;
+            --panel-bg: rgba(15, 23, 42, 0.9);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            perspective: 1200px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Top Header & Profile Pic */
+        header {
+            padding: 15px 30px;
+            background: #000;
+            border-bottom: 2px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        /* Profile Picture Styling */
+        .profile-container {
+            position: relative;
+            width: 70px;
+            height: 70px;
+        }
+        .profile-pic {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid #333;
+            object-fit: cover;
+            background-color: #1e293b; /* Fallback color */
+        }
+        .online-dot {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 15px;
+            height: 15px;
+            background-color: var(--term-green);
+            border-radius: 50%;
+            border: 2px solid #000;
+            box-shadow: 0 0 10px var(--term-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .sys-title h1 { font-size: 1.5rem; letter-spacing: 2px; }
+        .sys-title span { color: var(--term-green); }
+
+        /* The Interactive Command Terminal */
+        .interactive-terminal {
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #000;
+            border: 1px solid #333;
+            border-top: 15px solid #222;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            z-index: 50;
+        }
+        
+        .terminal-output {
+            color: var(--term-green);
+            margin-bottom: 10px;
+            line-height: 1.6;
+            min-height: 80px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            color: var(--term-green);
+            font-weight: bold;
+        }
+
+        .input-line input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            width: 100%;
+            margin-left: 10px;
+            outline: none;
+        }
+
+        .command-helpers {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #333;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .cmd-btn {
+            background: transparent;
+            border: 1px solid #64748b;
+            color: #94a3b8;
+            padding: 3px 8px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 3px;
+            font-family: inherit;
+            transition: 0.2s;
+        }
+        .cmd-btn:hover { background: #333; color: #fff; }
+
+        /* Dashboard Profiles */
+        .dashboard-container {
+            display: flex;
+            flex: 1;
+            padding: 0 20px 20px 20px;
+            gap: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            position: relative;
+        }
+        
+        .dashboard-container.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .panel {
+            flex: 1;
+            background: var(--panel-bg);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 30px;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+            display: none;
+            animation: slideUp 0.5s forwards;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .labview-panel { border-top: 5px solid var(--labview-neon); box-shadow: 0 0 40px rgba(56, 189, 248, 0.1); }
+        .labview-panel h2 { color: var(--labview-neon); border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;}
+        
+        .ai-panel { border-top: 5px solid var(--ai-neon); box-shadow: 0 0 40px rgba(192, 132, 252, 0.1); }
+        .ai-panel h2 { color: var(--ai-neon); border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;}
+
+        /* Specs Grid (Skills, Hardware, Libraries) */
+        .spec-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .spec-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .labview-panel .spec-box { border-left: 3px solid var(--labview-neon); }
+        .ai-panel .spec-box { border-left: 3px solid var(--ai-neon); }
+        
+        .spec-box h4 {
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+        .spec-box ul {
+            list-style: none;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .spec-box ul li::before {
+            content: ">> ";
+            color: #64748b;
+        }
+
+        /* 3D Project Cards */
+        .project-card {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            transform-style: preserve-3d;
+            transition: transform 0.1s;
+        }
+        .project-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.02);
+            transform: translateZ(-10px);
+        }
+        .project-card h3 { transform: translateZ(20px); margin-bottom: 10px; font-size: 1.1rem; }
+        .project-card p { transform: translateZ(10px); font-size: 0.9rem; color: #9ca3af; line-height: 1.5; margin-bottom: 8px;}
+        .labview-panel .project-card { border-left: 4px solid var(--labview-neon); }
+        .ai-panel .project-card { border-left: 4px solid var(--ai-neon); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px;}
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <!-- PROFILE PICTURE SECTION -->
+            <div class="profile-container">
+                <!-- Replace 'YOUR_PROFILE_PIC_URL_HERE.jpg' with your actual image link -->
+                <img src="F:\Portfolio\IMG_20260115_122943.jpg" alt="Rupak Profile" class="profile-pic">
+                <div class="online-dot"></div>
+            </div>
+            <div class="sys-title">
+                <h1>SYS.ADMIN: <span>RAMISEETI V V S N RUPAK</span></h1>
+                <p style="font-size: 0.7rem; color: #64748b;">APPLICATION ENGINEER | SYSTEM STATUS: ONLINE</p>
+            </div>
+        </div>
+        <div style="font-size: 0.8rem; color: #64748b;">
+            AWAITING COMMAND
+        </div>
+    </header>
+
+    <!-- The Interactive Terminal Interface -->
+    <div class="interactive-terminal">
+        <div class="terminal-output" id="outputConsole">
+            > SYSTEM BOOT SEQUENCE INITIATED...<br>
+            > Establishing secure connection to Rupak's portfolio.<br>
+            > TWO (2) PROFILES DETECTED.<br>
+            > Type <span style="color:#fff">help</span> to view available commands.
+        </div>
+        
+        <div class="input-line">
+            <span>C:\SYS></span>
+            <input type="text" id="cmdInput" autocomplete="off" spellcheck="false" autofocus>
+        </div>
+
+        <div class="command-helpers">
+            Quick Execute: 
+            <button class="cmd-btn" onclick="executeCmd('load hw')">load hw</button>
+            <button class="cmd-btn" onclick="executeCmd('load ai')">load ai</button>
+            <button class="cmd-btn" onclick="executeCmd('clear')">clear</button>
+        </div>
+    </div>
+
+    <!-- The Split Dashboard Container -->
+    <div class="dashboard-container" id="dashboard">
+        
+        <!-- ========================================== -->
+        <!-- LABVIEW / HARDWARE AUTOMATION PANEL        -->
+        <!-- ========================================== -->
+        <div class="panel labview-panel" id="hwPanel">
+            <h2>⚙️ HARDWARE AUTOMATION CORE</h2>
+            <p style="color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
+                A dual-disciplined engineer specializing in robust hardware automation. I bridge the gap between physical sensor telemetry and advanced algorithms, architecting mission-critical test environments and high-fidelity simulators.
+            </p>
+            
+            <!-- Skills & Hardware Specs Grid -->
+            <div class="spec-grid">
+                <div class="spec-box">
+                    <h4>SOFTWARE & SKILLS</h4>
+                    <ul>
+                        <li>NI LabVIEW (FPGA, RT, HOST)</li>
+                        <li>Python</li>
+                        <li>Object-Oriented Arch (OOP)</li>
+                    </ul>
+                </div>
+                <div class="spec-box">
+                    <h4>HARDWARE ARSENAL</h4>
+                    <ul>
+                        <li>DAQ, PXI, CompactRIO</li>
+                        <li>USRP & Power Supplies</li>
+                        <li>Signal Generator/Analyzer</li>
+                        <li>Oscilloscope, DMM, LNA</li>
+                    </ul>
+                </div>
+                <div class="spec-box">
+                    <h4>PROTOCOLS</h4>
+                    <ul>
+                        <li>MIL-STD-1553</li>
+                        <li>TCP/IP, UDP, Ethernet</li>
+                        <li>SPI, I2C, CAN</li>
+                        <li>RS-422/485, Modbus</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 style="color: var(--text-main); margin-top: 30px; font-size: 1.2rem; border-bottom: 1px dashed #333; padding-bottom: 5px;">> EXECUTED MISSIONS</h3>
+
+            <!-- Project 1 -->
+            <div class="project-card tilt-card">
+                <h3 style="color: var(--labview-neon);">> Data Acquisition & Control System</h3>
+                <p><strong>Initiative: DRDO (DRDL)</strong></p>
+                <p>Engineered a comprehensive monitoring architecture that ingested raw physical telemetry (temperature, pressure, strain) and applied precise PID algorithms to execute automated, real-time control logic.This project focused on building a real-time monitoring and control system using LabVIEW. I integrated NI DAQ hardware to collect data from sensors. The raw data was processed into meaningful values and compared with reference inputs. Based on this, PID control logic was implemented to automatically control actuators.</p>
+            </div>
+
+            <!-- Project 2 -->
+            <div class="project-card tilt-card">
+                <h3 style="color: var(--labview-neon);">> KU-Band Radar Target Simulator</h3>
+                <p><strong>Initiative: DRDO (RCI)</strong>[cite: 1]</p>
+                <p>Architected a high-fidelity Ku-band simulator utilizing FPGA-based signal processing to dynamically emulate target velocities and ranges, providing a cost-effective and repeatable testing environment.</p>
+            </div>
+
+            <!-- Project 3 -->
+            <div class="project-card tilt-card">
+                <h3 style="color: var(--labview-neon);">> Checkout for Satellite Subsystem</h3>
+                <p><strong>Initiative: DRDO (RCI) - Ongoing</strong>[cite: 1]</p>
+                <p>Developed a communication and data management system to establish reliable interfaces using RS-422/485 and MIL-STD-1553 protocols. Integrates DIO, relays, power supplies, and an RF module for high-speed satellite data transmission and testing.a communication and testing system for satellite subsystems. It involves interfacing using protocols like RS-422/485 and MIL-STD-1553, along with DIO, relays, and power supplies. The system can test both individual subsystems and integrated systems. It also uses high-speed RF communication and modulation techniques to transmit and receive satellite data, simulating real operational conditions.</p>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- AI / ML SOFTWARE ENGINEER PANEL            -->
+        <!-- ========================================== -->
+        <div class="panel ai-panel" id="aiPanel">
+            <h2>🧠 NEURAL INTELLIGENCE CORE</h2>
+            <p style="color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
+                Transforming complex, high-volume datasets into predictive deep learning models and automated decision-making engines. Translating digital intelligence into actionable, real-time dashboards.[cite: 2]
+            </p>
+
+            <!-- Skills & Libraries Specs Grid -->
+            <div class="spec-grid">
+                <div class="spec-box">
+                    <h4>LANGUAGES & TOOLS</h4>
+                    <ul>
+                        <li>Python, Java, MATLAB</li>
+                        <li>NI LabVIEW Integration</li>
+                        <li>Jupyter Notebook, Git</li>
+                        <li>Basic SQL</li>
+                    </ul>
+                </div>
+                <div class="spec-box">
+                    <h4>ML FRAMEWORKS</h4>
+                    <ul>
+                        <li>TensorFlow</li>
+                        <li>Scikit-Learn</li>
+                        <li>LightGBM</li>
+                        <li>CNNs & Deep Learning</li>
+                    </ul>
+                </div>
+                <div class="spec-box">
+                    <h4>DATA LIBRARIES</h4>
+                    <ul>
+                        <li>NumPy</li>
+                        <li>Pandas</li>
+                        <li>Matplotlib</li>
+                        <li>Streamlit Dashboards</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 style="color: var(--text-main); margin-top: 30px; font-size: 1.2rem; border-bottom: 1px dashed #333; padding-bottom: 5px;">> TRAINED MODELS</h3>
+
+            <!-- Project 1 -->
+            <div class="project-card tilt-card">
+                <h3 style="color: var(--ai-neon);">> Predictive Maintenance of Sensors</h3>
+                <p><strong>Dataset: Industrial Sensor Telemetry</strong></p>
+                <p>Designed a machine learning pipeline capable of forecasting hardware degradation before failure occurs. Processed live streams via regression models, achieving a 95% accuracy rate in generating preventative maintenance alerts.This project is about predicting when a sensor might fail before it actually happens. I used machine learning models like Random Forest and LightGBM on real-time sensor data to detect faults. The results were connected to a LabVIEW/Streamlit dashboard for live monitoring and alerts, achieving around 95% accuracy.</p>
+            </div>
+
+            <!-- Project 2 -->
+            <div class="project-card tilt-card">
+                <h3 style="color: var(--ai-neon);">> AI-Based Alzheimer's Detection</h3>
+                <p><strong>Dataset: MRI Scan Imagery</strong></p>
+                <p>Developed a highly sensitive deep learning framework to analyze MRI imagery.Applied sophisticated CNN architectures and transfer learning to successfully identify early-stage indicators of Alzheimer’s disease.a deep learning model to detect Alzheimer’s disease at an early stage using MRI scan images. I used CNN and TensorFlow for classification, along with image preprocessing and training pipelines, which resulted in high accuracy and precision.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const inputField = document.getElementById('cmdInput');
+        const outputConsole = document.getElementById('outputConsole');
+        const dashboard = document.getElementById('dashboard');
+        const hwPanel = document.getElementById('hwPanel');
+        const aiPanel = document.getElementById('aiPanel');
+
+        // Always keep focus on input when clicking anywhere on the terminal background
+        document.querySelector('.interactive-terminal').addEventListener('click', () => {
+            inputField.focus();
+        });
+
+        // Handle Enter Key
+        inputField.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const command = inputField.value.trim().toLowerCase();
+                inputField.value = ''; // clear input
+                processCommand(command);
+            }
+        });
+
+        // Function triggered by both typing and quick buttons
+        function executeCmd(cmd) {
+            processCommand(cmd);
+            inputField.focus();
+        }
+
+        // The Engine that processes commands
+        function processCommand(cmd) {
+            printLog(`<span style="color:#fff">C:\\SYS> ${cmd}</span>`);
+
+            switch(cmd) {
+                case 'help':
+                    printLog("> AVAILABLE COMMANDS:");
+                    printLog("  <span style='color:#38bdf8'>load hw</span>  - Boot LabVIEW / Hardware Automation profile");
+                    printLog("  <span style='color:#c084fc'>load ai</span>  - Boot Deep Learning / AI profile");
+                    printLog("  <span style='color:#facc15'>clear</span>    - Reset terminal and close profiles");
+                    break;
+                case 'load hw':
+                    printLog("> <span style='color:#38bdf8'>Loading Hardware Protocols...</span>");
+                    printLog("> PXI Chassis Linked. DAQ Systems Online.");
+                    showPanel('hw');
+                    break;
+                case 'load ai':
+                    printLog("> <span style='color:#c084fc'>Booting Neural Network...</span>");
+                    printLog("> Weights loaded. TensorFlow Active.");
+                    showPanel('ai');
+                    break;
+                case 'clear':
+                    outputConsole.innerHTML = "> System reset.<br>> Type 'help' for commands.";
+                    dashboard.classList.remove('visible');
+                    setTimeout(() => {
+                        hwPanel.style.display = 'none';
+                        aiPanel.style.display = 'none';
+                    }, 500); 
+                    break;
+                case '':
+                    break; 
+                default:
+                    printLog(`> Error: Command '${cmd}' not recognized. Type 'help'.`);
+            }
+        }
+
+        function printLog(text) {
+            outputConsole.innerHTML += `<br>${text}`;
+            outputConsole.scrollTop = outputConsole.scrollHeight;
+        }
+
+        function showPanel(type) {
+            dashboard.classList.add('visible');
+            
+            if (type === 'hw') {
+                hwPanel.style.display = 'block';
+                aiPanel.style.display = 'none';
+            } else if (type === 'ai') {
+                hwPanel.style.display = 'none';
+                aiPanel.style.display = 'block';
+            }
+        }
+
+        // 3D Card Hover Logic
+        document.querySelectorAll('.tilt-card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const rotateX = ((y - rect.height / 2) / (rect.height / 2)) * -8;
+                const rotateY = ((x - rect.width / 2) / (rect.width / 2)) * 8;
+                card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = `rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+            });
+        });
+    </script>
+</body>
+</html>
